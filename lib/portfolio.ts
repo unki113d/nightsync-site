@@ -41,6 +41,25 @@ export type StudioMetrics = {
 const ROBLOX_CACHE_SECONDS = 900;
 const ROBLOX_DETAILS_BATCH_SIZE = 50;
 
+function sumAvailableGameMetric(
+  universeIds: number[],
+  details: Map<number, RobloxGameDetails>,
+  field: "playing" | "visits",
+): number | undefined {
+  let total = 0;
+  let found = false;
+
+  for (const id of universeIds) {
+    const value = details.get(id)?.[field];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      total += value;
+      found = true;
+    }
+  }
+
+  return found ? total : undefined;
+}
+
 export function formatMetric(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return "Not published";
   return new Intl.NumberFormat("en", {
@@ -130,8 +149,14 @@ async function fetchAllGroupGameDetails(universeIds: number[]) {
     batches.push(universeIds.slice(index, index + ROBLOX_DETAILS_BATCH_SIZE));
   }
 
-  const details = await Promise.all(batches.map(fetchRobloxDetails));
-  return new Map(details.flatMap((batch) => [...batch.entries()]));
+  const settledDetails = await Promise.allSettled(
+    batches.map(fetchRobloxDetails),
+  );
+  return new Map(
+    settledDetails.flatMap((result) =>
+      result.status === "fulfilled" ? [...result.value.entries()] : [],
+    ),
+  );
 }
 
 export async function getStudioMetrics(): Promise<StudioMetrics> {
@@ -154,21 +179,11 @@ export async function getStudioMetrics(): Promise<StudioMetrics> {
 
   try {
     const details = await fetchAllGroupGameDetails(universeIds);
-    const completePlaying = universeIds.every((id) =>
-      Number.isFinite(details.get(id)?.playing),
-    );
-    const completeVisits = universeIds.every((id) =>
-      Number.isFinite(details.get(id)?.visits),
-    );
 
     return {
       ...metrics,
-      playing: completePlaying
-        ? universeIds.reduce((total, id) => total + (details.get(id)?.playing ?? 0), 0)
-        : undefined,
-      visits: completeVisits
-        ? universeIds.reduce((total, id) => total + (details.get(id)?.visits ?? 0), 0)
-        : undefined,
+      playing: sumAvailableGameMetric(universeIds, details, "playing"),
+      visits: sumAvailableGameMetric(universeIds, details, "visits"),
     };
   } catch {
     return metrics;

@@ -89,9 +89,9 @@ function ProjectCard({ game }: { game: PortfolioGame }) {
                 <ArrowSquareOut aria-hidden size={17} />
               </a>
             )}
-            {game.rotrendsUrl && (
-              <a href={game.rotrendsUrl} target="_blank" rel="noreferrer">
-                View analytics
+            {game.romonitorUrl && (
+              <a href={game.romonitorUrl} target="_blank" rel="noreferrer">
+                View on RoMonitor
                 <ArrowSquareOut aria-hidden size={17} />
               </a>
             )}
